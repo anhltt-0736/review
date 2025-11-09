@@ -1,5 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from "typeorm"
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  OneToMany,
+  CreateDateColumn,
+} from "typeorm"
 import { User } from "../../auth/entities/user.entity"
+import { Comment } from "./comment.entity"
 
 @Entity("articles")
 export class Article {
@@ -24,6 +32,11 @@ export class Article {
     { eager: true },
   )
   author: User
+
+  @OneToMany(() => Comment, (comment) => comment.article, {
+    cascade: true,
+  })
+  comments: Comment[]
 
   @CreateDateColumn()
   createdAt: Date
