@@ -1,35 +1,104 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import type { FormEvent } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Header from "@/components/header"
 
 export default function EditorPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const slug = searchParams.get("slug")
+  const isEditMode = Boolean(slug)
+
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [body, setBody] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const router = useRouter()
+  const [fetchError, setFetchError] = useState("")
+  const [prefillLoading, setPrefillLoading] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem("token")
     if (!token) {
       router.push("/login")
     }
-  }, [])
+  }, [router])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  useEffect(() => {
+    if (!slug) {
+      setFetchError("")
+      return
+    }
+
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.push("/login")
+      return
+    }
+
+    const loadArticle = async () => {
+      setPrefillLoading(true)
+      setFetchError("")
+
+      try {
+        const response = await fetch(`http://localhost:3001/api/articles/${slug}`)
+        const payload = await response.json().catch(() => null)
+
+        if (!response.ok) {
+          throw new Error(payload?.message || "Failed to load article")
+        }
+
+        const article = payload?.data
+
+        if (!article) {
+          throw new Error("Article not found")
+        }
+
+        const storedUser = localStorage.getItem("user")
+        const currentUser = storedUser ? JSON.parse(storedUser) : null
+
+        if (currentUser && article.author?.id !== currentUser.id) {
+          setFetchError("You do not have permission to edit this article")
+          return
+        }
+
+        setTitle(article.title)
+        setDescription(article.description)
+        setBody(article.body)
+      } catch (err) {
+        setFetchError((err as Error).message || "Unable to load article")
+      } finally {
+        setPrefillLoading(false)
+      }
+    }
+
+    loadArticle()
+  }, [slug, router])
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (prefillLoading) {
+      return
+    }
+
     setError("")
     setLoading(true)
 
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch("http://localhost:3001/api/articles", {
-        method: "POST",
+
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      const method = isEditMode ? "PUT" : "POST"
+      const url = `http://localhost:3001/api/articles${isEditMode ? `/${slug}` : ""}`
+
+      const response = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -41,11 +110,17 @@ export default function EditorPage() {
         }),
       })
 
+      const data = await response.json().catch(() => ({}))
+
       if (response.ok) {
-        router.push("/")
+        const nextSlug = isEditMode ? slug : data?.data?.slug
+        if (nextSlug) {
+          router.push(`/article/${nextSlug}`)
+        } else {
+          router.push("/")
+        }
       } else {
-        const data = await response.json()
-        setError(data.message || "Failed to publish article")
+        setError(data?.message || "Failed to publish article")
       }
     } catch (err) {
       setError("An error occurred. Please try again.")
@@ -54,14 +129,30 @@ export default function EditorPage() {
     }
   }
 
+  const formDisabled = loading || prefillLoading
+
   return (
     <>
       <Header />
       <main className="max-w-3xl mx-auto px-4 py-12">
-        <h1 className="text-3xl font-bold mb-8">Write Article</h1>
+        <h1 className="text-3xl font-bold mb-8">{isEditMode ? "Edit Article" : "Write Article"}</h1>
+
+        {prefillLoading && (
+          <p className="text-sm text-muted-foreground mb-4">Loading article details...</p>
+        )}
+
+        {fetchError && (
+          <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm mb-4">
+            {fetchError}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {error && <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">{error}</div>}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+              {error}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium mb-2">Title</label>
@@ -72,6 +163,7 @@ export default function EditorPage() {
               className="w-full px-4 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-lg"
               placeholder="Article Title"
               required
+              disabled={formDisabled}
             />
           </div>
 
@@ -84,6 +176,7 @@ export default function EditorPage() {
               className="w-full px-4 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="Brief description of your article"
               required
+              disabled={formDisabled}
             />
           </div>
 
@@ -96,16 +189,23 @@ export default function EditorPage() {
               rows={15}
               placeholder="Write your article content here..."
               required
+              disabled={formDisabled}
             />
           </div>
 
           <div className="flex gap-4">
             <button
               type="submit"
-              disabled={loading}
+              disabled={formDisabled}
               className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 transition disabled:opacity-50"
             >
-              {loading ? "Publishing..." : "Publish Article"}
+              {loading
+                ? isEditMode
+                  ? "Updating..."
+                  : "Publishing..."
+                : isEditMode
+                ? "Save Changes"
+                : "Publish Article"}
             </button>
             <button
               type="button"

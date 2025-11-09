@@ -5,6 +5,7 @@ import { AuthModule } from "./auth/auth.module"
 import { ArticlesModule } from "./articles/articles.module"
 import { User } from "./auth/entities/user.entity"
 import { Article } from "./articles/entities/article.entity"
+import { Comment } from "./articles/entities/comment.entity"
 
 @Module({
   imports: [
@@ -12,7 +13,7 @@ import { Article } from "./articles/entities/article.entity"
     TypeOrmModule.forRoot({
       type: "sqlite",
       database: "nexus.db",
-      entities: [User, Article],
+      entities: [User, Article, Comment],
       synchronize: true,
     }),
     AuthModule,
