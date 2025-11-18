@@ -35,7 +35,13 @@ export default function Header() {
         <nav className="flex items-center gap-6">
           {isAuthenticated ? (
             <>
-              <span className="text-sm text-muted-foreground">Welcome, {username}</span>
+            <span className="text-sm text-muted-foreground">Welcome, {username}</span>
+              <Link href="/favorites" className="text-sm text-foreground hover:text-primary transition">
+                Favorites
+              </Link>
+              <Link href="/following" className="text-sm text-foreground hover:text-primary transition">
+                Following
+              </Link>
               <Link href="/settings" className="text-sm text-foreground hover:text-primary transition">
                 Settings
               </Link>
