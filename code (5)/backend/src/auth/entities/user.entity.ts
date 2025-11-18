@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from "typeorm"
 import { Article } from "../../articles/entities/article.entity"
+import { Comment } from "../../articles/entities/comment.entity"
 
 @Entity("users")
 export class User {
@@ -26,6 +27,9 @@ export class User {
     (article) => article.author,
   )
   articles: Article[]
+
+  @OneToMany(() => Comment, (comment) => comment.author)
+  comments: Comment[]
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date
